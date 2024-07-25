@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdint.h>
+#include <sys/mman.h>
 
 #define PLATFORM_MODEL_IOCTL_MAGIC 0x5537
 #define PLATFORM_MODEL_IOCTL_SET_IRQFD	_IOW(PLATFORM_MODEL_IOCTL_MAGIC, 2, void *)
@@ -14,8 +15,9 @@
 
 struct dma_region {
     uint64_t dma_buffer_phys;
-	uint64_t unused;
-	uint64_t dma_buffer_size;
+	void *unused; //do not touch!
+    void *dma_buffer_virt_user;
+	size_t dma_buffer_size;
 };
 
 int main()
@@ -39,11 +41,22 @@ int main()
             return -1;
         }
         printf("dma buffer %d: 0x%llx\n", i, dma_regions[i].dma_buffer_phys);
+        dma_regions[i].dma_buffer_virt_user =
+            mmap(NULL, dma_regions[i].dma_buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, device_fd, dma_regions[i].dma_buffer_phys);
     }
 
     ret = write(device_fd, write_buffer, 32);
     if (ret < 0) {
         printf("write error, ret = %d\n", ret);
+    }
+
+    // free dma buffers.
+    for (i = 0; i < 8; i++) {
+        ret = ioctl(device_fd, PLATFORM_MODEL_IOCTL_FREE_DMA, &dma_regions[i]);
+        if (ret < 0) {
+            printf("ioctl error, ret = %d\n", ret);
+            return -1;
+        }
     }
 
     close(device_fd);

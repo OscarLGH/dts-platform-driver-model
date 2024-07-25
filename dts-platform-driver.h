@@ -27,7 +27,8 @@ struct mmio_reg {
 
 struct dma_region {
     dma_addr_t dma_buffer_phys;
-	void *dma_buffer_virt;
+	void *dma_buffer_virt_kernel;
+    void *dma_buffer_virt_user;
 	size_t dma_buffer_size;
 };
 

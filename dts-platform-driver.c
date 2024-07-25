@@ -101,9 +101,9 @@ static long dts_platform_driver_model_char_ioctl(struct file *file, unsigned int
 			break;
         case PLATFORM_MODEL_IOCTL_ALLOC_DMA:
             copy_from_user(&dma_usr_region, (void * __user)arg, sizeof(dma_usr_region));
-            dma_usr_region.dma_buffer_virt =
+            dma_usr_region.dma_buffer_virt_kernel =
                 dma_alloc_coherent(&dev->pdev->dev, dma_usr_region.dma_buffer_size, &dma_usr_region.dma_buffer_phys, GFP_KERNEL);
-            if (!dma_usr_region.dma_buffer_virt) {
+            if (!dma_usr_region.dma_buffer_virt_kernel) {
                 dev_err(&dev->pdev->dev, "Failed to allocate DMA buffer.");
                 return -ENOMEM;
             }
@@ -112,7 +112,7 @@ static long dts_platform_driver_model_char_ioctl(struct file *file, unsigned int
             break;
         case PLATFORM_MODEL_IOCTL_FREE_DMA:
             copy_from_user(&dma_usr_region, (void * __user)arg, sizeof(dma_usr_region));
-            dma_free_coherent(&dev->pdev->dev, dma_usr_region.dma_buffer_size, dma_usr_region.dma_buffer_virt, dma_usr_region.dma_buffer_phys);
+            dma_free_coherent(&dev->pdev->dev, dma_usr_region.dma_buffer_size, dma_usr_region.dma_buffer_virt_kernel, dma_usr_region.dma_buffer_phys);
             ret = 0;
 		default:
 			ret = 0;
@@ -135,13 +135,13 @@ static int dts_platform_driver_model_char_mmap(struct file *file, struct vm_area
 
 		if (remap_pfn_range(vma,
 			vma->vm_start,
-			vma->vm_pgoff + dev->reg.phys / PAGE_SIZE,
-			dev->reg.size < vma_size ? dev->reg.size : vma_size,
+			vma->vm_pgoff,
+			vma_size,
 			vma->vm_page_prot)) {
 			return -EAGAIN;
 		}
 
-		current_size += (dev->reg.size < vma_size ? dev->reg.size : vma_size);
+		current_size += vma_size;
 	}
 
 	return 0;
