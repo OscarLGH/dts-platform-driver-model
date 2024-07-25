@@ -11,7 +11,7 @@
 #define PLATFORM_MODEL_IOCTL_ALLOC_DMA	_IOW(PLATFORM_MODEL_IOCTL_MAGIC, 4, void *)
 #define PLATFORM_MODEL_IOCTL_FREE_DMA	_IOW(PLATFORM_MODEL_IOCTL_MAGIC, 5, void *)
 
-#define DEVICE_NAME "dts_platform_driver_dev_0"
+#define DEVICE_NAME "/dev/dts_platform_driver_dev_0"
 
 struct dma_region {
     uint64_t dma_buffer_phys;

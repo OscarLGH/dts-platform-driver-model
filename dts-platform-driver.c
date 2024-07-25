@@ -173,7 +173,7 @@ int dts_platform_driver_model_device_fd_create(struct dts_platform_driver_model 
 	ret = cdev_add(&pdm_dev->cdev, pdm_dev->dev, 1);
 
 	device_create(dts_platform_driver_model_class, NULL, pdm_dev->dev, NULL, buffer);
-	printk("add char file %d:%d for %s\n", major, minor, buffer);
+	printk("add char file. (%d %d))\n", MAJOR(pdm_dev->dev), MINOR(pdm_dev->dev), buffer);
 
 	return 0;
 }
