@@ -163,7 +163,7 @@ int dts_platform_driver_model_device_fd_create(struct dts_platform_driver_model 
 	int ret;
 	char buffer[256] = {0};
 	sprintf(buffer,
-		"dts_platform_driver_dev_%d",
+		"soc_dev_%d",
 		pdm_dev->device_idx
 	);
 	alloc_chrdev_region(&pdm_dev->dev, 0, 255, "dts_platform_driver_model");
@@ -225,7 +225,7 @@ static int dts_platform_driver_probe(struct platform_device *pdev)
     data->irq = platform_get_irq(pdev, 0);
     printk("irq:%d.\n", data->irq);
 
-    ret = devm_request_irq(&pdev->dev, data->irq, dts_platform_driver_irq, 0, "", data);
+    ret = devm_request_irq(&pdev->dev, data->irq, dts_platform_driver_irq, 0, "dts_platform_driver_dev_irq", data);
     if (ret) {
         dev_err(&pdev->dev, "Failed to request IRQ %d %d\n", data->irq, ret);
         return ret;
