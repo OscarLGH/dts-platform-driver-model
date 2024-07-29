@@ -12,14 +12,32 @@
 #define PLATFORM_MODEL_IOCTL_ALLOC_DMA	_IOW(PLATFORM_MODEL_IOCTL_MAGIC, 4, void *)
 #define PLATFORM_MODEL_IOCTL_FREE_DMA	_IOW(PLATFORM_MODEL_IOCTL_MAGIC, 5, void *)
 
-#define DEVICE_NAME "/dev/soc_dev_0"
+#define DEVICE_NAME "/dev/soc_dev_%d"
+#define DEVICE0_NAME "/dev/soc_dev_0"
 
+#define MAX_SOC_DEV 255
 typedef struct dma_region {
     uint64_t dma_buffer_phys;
 	void *unused; //do not touch!
     void *dma_buffer_virt_user;
 	size_t dma_buffer_size;
 } dma_region;
+
+int enum_devices()
+{
+    int device_fd = 0;
+    int cnt = 0;
+    char buf[256] = {0};
+    for (int i = 0; i < MAX_SOC_DEV; i++) {
+        sprintf(buf, DEVICE_NAME, i);
+        device_fd = open(buf, O_RDWR);
+        if (device_fd > 0) {
+            cnt++;
+            close(device_fd);
+        }
+    }
+    return cnt;
+}
 
 dma_region * allocate_dma(int device_fd, size_t dma_size)
 {
@@ -68,10 +86,16 @@ int main()
 {
     int i;
     int ret;
+    int cnt;
     struct dma_region *dma_regions[8] = {0};
     uint64_t *dma_region_ptr;
     uint64_t cmd[0x100] = {0};
-    int device_fd = open(DEVICE_NAME, O_RDWR);
+
+    cnt = enum_devices();
+
+    printf("device num:%d\n", cnt);
+
+    int device_fd = open(DEVICE0_NAME, O_RDWR);
     if (device_fd < 0) {
         printf("open device error!\n");
         return -1;

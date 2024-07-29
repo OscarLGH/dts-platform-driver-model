@@ -2,7 +2,7 @@
 
 #define MY_MMIO_OFFSET 0x0  // Offset to write data
 
-struct class *dts_platform_driver_model_class;
+struct class *dts_platform_driver_model_class = NULL;
 u64 device_cnt = 0;
 
 static irqreturn_t dts_platform_driver_irq(int irq, void *data)
@@ -171,6 +171,9 @@ int dts_platform_driver_model_device_fd_create(struct dts_platform_driver_model 
 	cdev_init(&pdm_dev->cdev, &dts_platform_driver_model_char_fops);
 	pdm_dev->cdev.owner = THIS_MODULE;
 	ret = cdev_add(&pdm_dev->cdev, pdm_dev->dev, 1);
+
+    if (!dts_platform_driver_model_class)
+        dts_platform_driver_model_class = class_create("soc");
 
 	device_create(dts_platform_driver_model_class, NULL, pdm_dev->dev, NULL, buffer);
 	printk("add char file. (%d %d))\n", MAJOR(pdm_dev->dev), MINOR(pdm_dev->dev), buffer);
