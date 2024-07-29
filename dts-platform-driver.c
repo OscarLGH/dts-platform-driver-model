@@ -15,7 +15,7 @@ static irqreturn_t dts_platform_driver_irq(int irq, void *data)
 	if (drv_data->efd_ctx)
 		eventfd_signal(drv_data->efd_ctx);
 
-	schedule_work(&drv_data->irq_wq);
+	//schedule_work(&drv_data->irq_wq);
 	return result;
 }
 
