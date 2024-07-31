@@ -19,6 +19,8 @@
 #include <linux/eventfd.h>
 #include <linux/workqueue.h>
 
+#include <linux/list.h>
+
 struct mmio_reg {
     u64 phys;
     size_t size;
@@ -30,6 +32,11 @@ struct dma_region {
     void *dma_buffer_virt_kernel;
     void *dma_buffer_virt_user;
     size_t dma_buffer_size;
+};
+
+struct dma_region_node {
+    struct dma_region* region;
+    struct list_head list;
 };
 
 struct dts_platform_driver_model {
@@ -60,6 +67,8 @@ struct dts_platform_driver_model {
 
 	/* for proc dev file */
 	struct proc_dir_entry *device_proc_entry;
+
+    struct list_head dma_regions_list;
 };
 
 /* basic ioctls */

@@ -82,7 +82,7 @@ static long dts_platform_driver_model_char_ioctl(struct file *file, unsigned int
 {
 	struct dts_platform_driver_model *dev = file->private_data;
 	int ret = 0;
-    struct dma_region dma_usr_region;
+    struct dma_region *dma_usr_region;
 
 	switch (cmd) {
 		case PLATFORM_MODEL_IOCTL_SET_IRQFD:
@@ -100,19 +100,43 @@ static long dts_platform_driver_model_char_ioctl(struct file *file, unsigned int
 			ret = 0;
 			break;
         case PLATFORM_MODEL_IOCTL_ALLOC_DMA:
-            copy_from_user(&dma_usr_region, (void * __user)arg, sizeof(dma_usr_region));
-            dma_usr_region.dma_buffer_virt_kernel =
-                dma_alloc_coherent(&dev->pdev->dev, dma_usr_region.dma_buffer_size, &dma_usr_region.dma_buffer_phys, GFP_KERNEL);
-            if (!dma_usr_region.dma_buffer_virt_kernel) {
+            dma_usr_region = kmalloc(sizeof(*dma_usr_region), GFP_KERNEL);
+            if (!dma_usr_region)
+                return -ENOMEM;
+            copy_from_user(dma_usr_region, (void * __user)arg, sizeof(*dma_usr_region));
+            dma_usr_region->dma_buffer_virt_kernel =
+                dma_alloc_coherent(&dev->pdev->dev, dma_usr_region->dma_buffer_size, &dma_usr_region->dma_buffer_phys, GFP_KERNEL);
+            if (!dma_usr_region->dma_buffer_virt_kernel) {
                 dev_err(&dev->pdev->dev, "Failed to allocate DMA buffer.");
+                kfree(dma_usr_region);
                 return -ENOMEM;
             }
-            copy_to_user((void * __user)arg, &dma_usr_region, sizeof(dma_usr_region));
+            copy_to_user((void * __user)arg, dma_usr_region, sizeof(*dma_usr_region));
+            struct dma_region_node *new_dma_node = kmalloc(sizeof(*new_dma_node), GFP_KERNEL);
+            if (!new_dma_node) {
+                kfree(dma_usr_region);
+                return -ENOMEM;
+            }
+            new_dma_node->region = dma_usr_region;
+            list_add_tail(&new_dma_node->list, &dev->dma_regions_list);
             ret = 0;
             break;
         case PLATFORM_MODEL_IOCTL_FREE_DMA:
-            copy_from_user(&dma_usr_region, (void * __user)arg, sizeof(dma_usr_region));
-            dma_free_coherent(&dev->pdev->dev, dma_usr_region.dma_buffer_size, dma_usr_region.dma_buffer_virt_kernel, dma_usr_region.dma_buffer_phys);
+            struct dma_region dma_usr_region_tmp;
+            copy_from_user(&dma_usr_region_tmp, (void * __user)arg, sizeof(dma_usr_region_tmp));
+            struct dma_region_node *node, *tmp;
+            list_for_each_entry_safe(node, tmp, &dev->dma_regions_list, list) {
+                if (node->region->dma_buffer_phys == dma_usr_region_tmp.dma_buffer_phys &&
+                    node->region->dma_buffer_size == dma_usr_region_tmp.dma_buffer_size) {
+                        dma_free_coherent(&dev->pdev->dev,
+                            node->region->dma_buffer_size,
+                            node->region->dma_buffer_virt_kernel,
+                            node->region->dma_buffer_phys);
+                        kfree(node->region);
+                        list_del(&node->list);
+                        kfree(node);
+                    }
+            }
             ret = 0;
 		default:
 			ret = 0;
@@ -129,6 +153,35 @@ static int dts_platform_driver_model_char_mmap(struct file *file, struct vm_area
 	long current_offset = 0;
 	long current_size = 0;
 	struct dts_platform_driver_model *dev = file->private_data;
+    bool can_map = false;
+
+    //mmap reg space, uncached.
+    if (vma->vm_pgoff == 0 && vma_size <= dev->reg.size) {
+        can_map = true;
+        vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+        if (remap_pfn_range(vma,
+			vma->vm_start,
+			dev->reg.phys / PAGE_SIZE,
+			vma_size,
+			vma->vm_page_prot)) {
+			return -EAGAIN;
+		}
+        return 0;
+    }
+
+    struct dma_region_node *node;
+    list_for_each_entry(node, &dev->dma_regions_list, list) {
+        if (node->region->dma_buffer_phys == vma->vm_pgoff * PAGE_SIZE &&
+            node->region->dma_buffer_size >= vma_size) {
+                can_map = true;
+                break;
+            }
+    }
+
+    if (!can_map) {
+        dev_err(&dev->pdev->dev, "mmap not allowed!");
+        return -ENOMEM;
+    }
 
 	pgprot_noncached(vma->vm_page_prot);
 	while (current_size < vma_size) {
@@ -237,6 +290,8 @@ static int dts_platform_driver_probe(struct platform_device *pdev)
     dts_platform_driver_model_device_fd_create(data);
 
     dev_set_drvdata(&pdev->dev, data);
+
+    INIT_LIST_HEAD(&data->dma_regions_list);
     return 0;
 }
 

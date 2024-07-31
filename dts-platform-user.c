@@ -20,6 +20,7 @@ typedef struct soc_device {
     int index;
     int device_fd;
     int event_fd;
+    uint64_t *mmio_ptr;
 } soc_device;
 
 typedef struct dma_region {
@@ -64,6 +65,12 @@ soc_device *open_soc_device(int index)
     ret_int = ioctl(ret->device_fd, PLATFORM_MODEL_IOCTL_SET_IRQFD, ret->event_fd);
     if (ret_int < 0) {
         printf("setting eventfd failed.\n", ret_int);
+        free(ret);
+        return NULL;
+    }
+    ret->mmio_ptr = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, ret->device_fd, 0);
+    if (ret->mmio_ptr == MAP_FAILED) {
+        printf("mmap regs failed.\n", ret_int);
         free(ret);
         return NULL;
     }
@@ -129,6 +136,20 @@ int send_command(soc_device *dev, uint64_t *cmd, int size)
     return ret;
 }
 
+int send_command_fast(soc_device *dev, uint64_t *cmd, int size)
+{
+    int ret = 0;
+    int i;
+
+    if (dev == NULL)
+        return -1;
+    
+    for (i = 0; i < size / 8; i++) {
+        dev->mmio_ptr[0] = cmd[i];
+    }
+    return ret;
+}
+
 int wait_command_finish(soc_device *dev)
 {
     int ret;
@@ -152,7 +173,7 @@ int main()
 
     for (dev_idx = 0; dev_idx < cnt; dev_idx++) {
         printf("opening device:%d\n", dev_idx);
-        soc_device *dev_ptr = open_soc_device(0);
+        soc_device *dev_ptr = open_soc_device(dev_idx);
         if (dev_ptr == NULL) {
             printf("open device error!\n");
             return -1;
@@ -185,7 +206,8 @@ int main()
         cmd[2] = 0x2;
         cmd[3] = 0x3;
 
-        ret = send_command(dev_ptr, cmd, sizeof(cmd[0]) * 4);
+        //ret = send_command(dev_ptr, cmd, sizeof(cmd[0]) * 4);
+        ret = send_command_fast(dev_ptr, cmd, sizeof(cmd[0]) * 4);
         if (ret < 0) {
             printf("write error, ret = %d\n", ret);
         }
