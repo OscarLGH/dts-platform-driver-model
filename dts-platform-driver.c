@@ -12,9 +12,13 @@ static irqreturn_t dts_platform_driver_irq(int irq, void *data)
 	drv_data->irq_cnt++;
 	printk("IRQ:%d\n", irq);
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 19, 0)
 	if (drv_data->efd_ctx)
 		eventfd_signal(drv_data->efd_ctx);
-
+#else
+    if (drv_data->efd_ctx)
+		eventfd_signal(drv_data->efd_ctx, 1);
+#endif
 	//schedule_work(&drv_data->irq_wq);
 	return result;
 }
@@ -225,8 +229,13 @@ int dts_platform_driver_model_device_fd_create(struct dts_platform_driver_model 
 	pdm_dev->cdev.owner = THIS_MODULE;
 	ret = cdev_add(&pdm_dev->cdev, pdm_dev->dev, 1);
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 19, 0)
     if (!dts_platform_driver_model_class)
         dts_platform_driver_model_class = class_create("soc");
+#else
+    if (!dts_platform_driver_model_class)
+        dts_platform_driver_model_class = class_create(THIS_MODULE, "soc");
+#endif
 
 	device_create(dts_platform_driver_model_class, NULL, pdm_dev->dev, NULL, buffer);
 	printk("add char file. (%d %d))\n", MAJOR(pdm_dev->dev), MINOR(pdm_dev->dev), buffer);
